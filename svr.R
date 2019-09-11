@@ -18,6 +18,43 @@ svr<-function(  train,
                 gamma=1,
                 C=1){
 
+      #Defining the kernel functions
+      polinomial_kernel<-function(X,Y,gamma,constant=0){
+            poli_kern<- (tcrossprod(X,Y)+constant)^gamma
+            return(poli_kern)
+      }
+      
+      sigmoidal_kernel<-function(X,Y,gamma,constant=0){
+            sig_kern<-tanh(gamma*tcrossprod(X,Y)+constant)
+            return(sig_kern)
+      }
+      
+      gaussian_kernel<-function(X,Y,gamma){
+            dist_matrix<- as.matrix(dist(rbind(X,Y),method = 'euclidean'))[1:(nrow(X)),(nrow(train)+1):(nrow(X)+nrow(Y))]
+            gaussian_kern<-exp(-gamma*dist_matrix^2)
+            return(gaussian_kern)
+      }
+      
+      
+      exp_kernel<-function(X,Y,gamma){
+            dist_matrix<- as.matrix(dist(rbind(X,Y),method = 'euclidean'))[1:(nrow(X)),(nrow(train)+1):(nrow(X)+nrow(Y))]
+            exp_kern<-exp(-gamma*dist_matrix)
+            return(exp_kern)
+      }
+      
+      cauchy_kernel<-function(X,Y,gamma){
+            dist_matrix<- as.matrix(dist(rbind(X,Y),method = 'euclidean'))[1:(nrow(X)),(nrow(train)+1):(nrow(X)+nrow(Y))]
+            cauchy_kern<-1/(1+2*gamma*(dist_matrix^2))
+            return(cauchy_kern)
+      }
+      
+      laplacian_kernel<-function(X,Y,gamma){
+            dist_matrix<- as.matrix(dist(rbind(X,Y),method = 'euclidean'))[1:(nrow(X)),(nrow(train)+1):(nrow(X)+nrow(Y))]
+            laplacian_kern<-exp(-(dist_matrix)*sqrt(2*gamma))
+            return(laplacian_kern)
+      }
+      
+      
       noise<-1e-4
       
       if(scale){
@@ -170,21 +207,24 @@ svr<-function(  train,
 }
 
 
-my_svr<-svr(train = train,test = test,formula = dist~.,kernel = 'linear',epsilon = 0.1,
-            scale = TRUE,threshold = 0.001,gamma = 1,C = 1)
+my_svr<-svr(train = train,test = test,formula = dist~.,kernel = 'gaussian',epsilon = 0.1,
+            scale = TRUE,threshold = 0.001,gamma = 2,C = 1)
 
 
 #Comparing with kernlab
 library(kernlab)
-mod_ksvm<-kernlab::ksvm(dist~.,data=train,C=1,epsilon=0.1,kernel='vanilladot')
-pred_ksvm<-predict(mod_ksvm,newdata=train) %>% as.vector()
+mod_ksvm<-kernlab::ksvm(dist~.,data=train,C=1,epsilon=0.1,kernel='rbfdot',kpar=list(sigma=2))
+pred_ksvm<-predict(mod_ksvm,newdata=test) %>% as.vector()
 
-(pred_ksvm-my_svr$predict_train) %>% mean
+(pred_ksvm-my_svr$predict_test) %>% mean
 
 
 #Comparing with e1071
 library(e1071)
-mod_e1071<-svm(dist~.,data=train,cost=1,epsilon=0.1,kernel='linear')
+mod_e1071<-svm(dist~.,data=train,cost=1,epsilon=0.1,kernel='polynomial',degree=2)
 pred_e171<-predict(mod_e1071,newdata=test)
 
 (pred_e171-my_svr$predict_test) %>% mean
+
+
+
