@@ -17,7 +17,7 @@ alfa_zero<-rep(0,nrow(train))
 alfas_index<-mod_ksvm@alphaindex %>% unlist
 
 alfa_zero[alfas_index]<-mod_ksvm@alpha %>% unlist
-crossprod(alfa_zero,as.matrix(train[,-3]))
+w_lol<-crossprod(alfa_zero,ifelse(train[,3]==1,1,-1)*as.matrix(train[,-3]))
 
 
 
@@ -191,7 +191,7 @@ svm<-function(  train,
       
       #A PORRA DE UM MENOS
       # alfa_sv<- -alfa_sv
-      w<-alfa_sv%*%X_train
+      w<-crossprod(alfa_sv,Y_train*X_train)
       
       
       #Calculating b
@@ -199,32 +199,19 @@ svm<-function(  train,
       b_aux<-which(alfa_sv>0 & alfa_sv<C)
       arg<-which.max(alfa_sv)
       
-      help<- ((Y_train[b_aux]*tcrossprod(X_train[b_aux,],w))/Y_train[b_aux]) %>% mean 
-      help
-      
-      
-      # b1<-Y_train-alfa_sv%*%X_aux
-      # b2<-Y_train+alfa_sv%*%X_aux
-      # 
-      
-      
-      # b1<-Y_train[alfa_up]-w%*%X_train[alfa_up,]+e
-      # b2<-Y_train[alfa_down]-w%*%X_train[alfa_down,]-e
-      # 
-      b<-median(c(b1,b2))
+      b<- (((1-(Y_train*tcrossprod(X_train,w)))/Y_train)) %>% median
       b
+      
+
       
       #calculating Predicted Values for test and traininig
       y_pred_train<-alfa_sv%*%X_aux %>% as.vector
-      y_pred_train<-y_pred_train+b
-      y_pred_train<-as.vector(y_pred_train)*sd[var_names[1]]+mean_train[var_names[1]]
+      y_pred_train<-sign(y_pred_train+b)
       
       
       y_pred_test<-alfa_sv%*%X_aux_test %>% as.vector
-      y_pred_test<-y_pred_test+b
-      y_pred_test<-as.vector(y_pred_test)*sd[var_names[1]]+mean_train[var_names[1]]
-      
-      #========================================================
+      y_pred_test<-sign(y_pred_test+b)
+           #========================================================
       
       return(list(predict_train=y_pred_train,predict_test=y_pred_test))
 }
