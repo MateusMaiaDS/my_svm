@@ -8,7 +8,7 @@ train<-data[train_index,]
 test<-data[-train_index,]
 
 library(kernlab)
-mod_ksvm<-kernlab::ksvm(classes~.,data=train,C=1,kernel='vanilladot')
+mod_ksvm<-kernlab::ksvm(classes~.,data=train,C=1,kernel='rbfdot',kpar=list(sigma=2))
 pred_ksvm<-predict(mod_ksvm,newdata=test) %>% as.vector()
 
 
@@ -23,16 +23,18 @@ w_lol<-crossprod(alfa_zero,ifelse(train[,3]==1,1,-1)*as.matrix(train[,-3]))
 
 library(e1071)
 mod_e1071<-svm(classes~.,data=train,cost=1,kernel='linear',gamma = 1)
+pred_e1071<-predict(mod_e1071,newdata=test)
 
-formula<-classes~.
-kernel<-'linear'
+
+
+formula=classes~.
+kernel='linear'
 scale=TRUE
 threshold=0.001
 gamma=1
 C=1
 
-
-svm<-function(  train,
+my_svm<-function(  train,
                 test,
                 formula,
                 kernel,
@@ -98,13 +100,14 @@ svm<-function(  train,
       X_train<-as.matrix(train[,colnames(train)!=var_names[1]])
       X_test<-as.matrix(test[,colnames(train)!=var_names[1]])
       
-      
+      #Some variables from model
       n <- nrow(X_train)
       p <- ncol(X_train)+1
       n_test<-nrow(X_test)
       
-      Y_train<-ifelse(train[,var_names[1]]==levels(train[,var_names[1]])[1],1,-1)
-      Y_test<-test[,var_names[1]]
+      levels_label<-levels(train[,var_names[[1]]])
+      Y_train<-ifelse(train[,var_names[1]]==levels_label[1],1,-1)
+      Y_test<-ifelse(test[,var_names[1]]==levels_label[1],1,-1)
       
       
       #Here the vector b will be dimension 2n x 1, therefore, before that we will define an auxliar matrix, in way that the multiplication
@@ -196,22 +199,37 @@ svm<-function(  train,
       
       #Calculating b
       
-      b_aux<-which(alfa_sv>0 & alfa_sv<C)
-      arg<-which.max(alfa_sv)
+      # b_aux<-which(alfa_sv>0 & alfa_sv<C)
+      # arg<-which.max(alfa_sv)
       
-      b<- (((1-(Y_train*tcrossprod(X_train,w)))/Y_train)) %>% median
+      # b<- median( (((1-(Y_train*tcrossprod(X_train,w)))/Y_train)) )
+      b<- median( (((1-Y_train*crossprod(alfa_sv*Y_train,X_aux))/Y_train)) )
+      
       b
       
 
       
       #calculating Predicted Values for test and traininig
-      y_pred_train<-alfa_sv%*%X_aux %>% as.vector
+      y_pred_train<- crossprod(alfa_sv*Y_train,X_aux)            
       y_pred_train<-sign(y_pred_train+b)
+      y_pred_train<-ifelse(y_pred_train==1,levels_label[1],levels_label[2])
       
       
-      y_pred_test<-alfa_sv%*%X_aux_test %>% as.vector
+      y_pred_test<- crossprod(alfa_sv*Y_train,X_aux_test) 
       y_pred_test<-sign(y_pred_test+b)
+      y_pred_test<-ifelse(y_pred_test==1,levels_label[1],levels_label[2])
+      
            #========================================================
       
-      return(list(predict_train=y_pred_train,predict_test=y_pred_test))
+      return(list(predict_train=y_pred_train,predict_test=y_pred_test,w=w,sv_index=alfa_total_aux,b=b))
 }
+
+
+my_svm<-my_svm(train = train,test = test,formula = classes~.,kernel = 'gaussian',
+            scale = TRUE,threshold = 0.001,gamma = 2,C = 1)
+
+(pred_ksvm==my_svm$predict_test) %>% sum
+
+par(mfrow=c(1,2))
+plot(test$x.1,test$x.2,col=as.factor(my_svm$predict_test),main='my_svm')
+plot(test$x.1,test$x.2,col=as.factor(pred_ksvm),main='kernlab_svm')
